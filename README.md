@@ -1,16 +1,19 @@
-## Hi there 👋
+# Jinwon Lee
 
-<!--
-**jinwon-lee-reliability/jinwon-lee-reliability** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+Distributed Systems & Reliability Engineer  
+18+ years in mission-critical enterprise systems
 
-Here are some ideas to get you started:
+## Focus Areas
+- High Availability Architecture
+- Incident Leadership & RCA
+- Database Engine Internals
+- Performance & Concurrency Analysis
+- Production Infrastructure Stability
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+## Current Direction
+Building practical reliability tooling and documenting real-world production case studies.
+
+---
+
+📍 South Korea  
+📫 jinwon.lee.engineer@gmail.com
