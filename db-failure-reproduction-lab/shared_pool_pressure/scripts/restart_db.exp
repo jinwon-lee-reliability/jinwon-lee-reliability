@@ -1,0 +1,341 @@
+#!/usr/bin/expect
+
+set timeout 300
+
+# 인자로 받은 함수 이름
+set FUNCTION [lindex $argv 0]
+
+# 상태 변수 설정
+set db1_status "unknown"
+set db2_status "unknown"
+
+# db1 작업
+send_user "Starting operations for db1...\n"
+
+# db1 환경 설정 파일 불러오기
+spawn /bin/ksh
+expect "# "
+
+# 환경 설정 파일 적용
+send ". ~/.profile\n"
+expect "# "
+
+# db1 지정된 함수 호출
+send "$FUNCTION\n"
+expect "# "
+
+# db1 DB 인스턴스 중지 (IMMEDIATE 옵션 사용)
+send "tbdown immediate\n"
+expect {
+    -re "tbdown failed. proc info file is deleted" {
+        send_user "db1: tbdown failed. The instance might already be stopped. Proceeding with tbboot.\n"
+        set db1_status "failure"
+        
+        # 이미 중지된 경우 바로 재시작
+        send "tbboot\n"
+        expect {
+            "Tibero instance started up (NORMAL mode)." {
+                send_user "db1: tbboot completed successfully.\n"
+                set db1_status "success"
+            }
+            timeout {
+                send_user "db1: tbboot did not complete in time, exiting.\n"
+                set db1_status "failure"
+            }
+        }
+    }
+    -re "tbdown failed to connect" {
+        send_user "db1: tbdown failed to connect. Proceeding with tbdown abnormal.\n"
+        set db1_status "failure"
+        
+        # tbdown abnormal 실행
+        send "tbdown abnormal\n"
+        expect {
+            "Tibero instance terminated (ABNORMAL mode)." {
+                send_user "db1: tbdown abnormal completed successfully. Proceeding with tbboot.\n"
+		sleep 10
+                
+                # tbboot 실행
+                send "tbboot\n"
+                expect {
+                    "Tibero instance started up (NORMAL mode)." {
+                        send_user "db1: tbboot completed successfully.\n"
+                        set db1_status "success"
+                    }
+                    timeout {
+                        send_user "db1: tbboot did not complete in time, exiting.\n"
+                        set db1_status "failure"
+                    }
+                }
+            }
+            timeout {
+                send_user "db1: tbdown abnormal did not complete in time.\n"
+                set db1_status "failure"
+            }
+        }
+    }
+    -re "tbdown failed to receive greeting" {
+        send_user "db1: tbdown failed to receive greeting. Proceeding with tbdown abnormal.\n"
+        set db1_status "failure"
+        
+        # tbdown abnormal 실행
+        send "tbdown abnormal\n"
+        expect {
+            "Tibero instance terminated (ABNORMAL mode)." {
+                send_user "db1: tbdown abnormal completed successfully. Proceeding with tbboot.\n"
+		sleep 10
+                
+                # tbboot 실행
+                send "tbboot\n"
+                expect {
+                    "Tibero instance started up (NORMAL mode)." {
+                        send_user "db1: tbboot completed successfully.\n"
+                        set db1_status "success"
+                    }
+                    timeout {
+                        send_user "db1: tbboot did not complete in time, exiting.\n"
+                        set db1_status "failure"
+                    }
+                }
+            }
+            timeout {
+                send_user "db1: tbdown abnormal did not complete in time.\n"
+                set db1_status "failure"
+            }
+        }
+    }
+    "Tibero instance terminated (IMMEDIATE mode)." {
+        send_user "db1: Tibero immediate completed successfully.\n"
+        set db1_status "success"
+	
+	# 정상 종료 후 tbboot 실행 추가
+    	send "tbboot\n"
+    	expect {
+        	"Tibero instance started up (NORMAL mode)." {
+            	send_user "db1: tbboot completed successfully.\n"
+            	set db1_status "success"
+        	}
+        timeout {
+            send_user "db1: tbboot did not complete in time, exiting.\n"
+            set db1_status "failure"
+        	}
+    	}
+    }
+    timeout {
+        send_user "db1: tbdown immediate did not respond within 5 minutes. Proceeding with tbdown abnormal.\n"
+
+        # tbdown 프로세스를 강제 종료
+        set pids [exec sh -c {ps -ef | grep tbdown | grep -v grep | awk '{print $2}'}]
+        if {[string length $pids] > 0} {
+            send_user "Killing tbdown processes: $pids\n"
+            exec kill -9 $pids
+        } else {
+            send_user "No tbdown processes found.\n"
+        }
+
+        # tbdown abnormal 실행
+        send "tbdown abnormal\n"
+        expect {
+            "Tibero instance terminated (ABNORMAL mode)." {
+                send_user "db1: tbdown abnormal completed successfully. Proceeding with tbboot.\n"
+	        sleep 10	
+                
+                # tbboot 실행
+                send "tbboot\n"
+                expect {
+                    "Tibero instance started up (NORMAL mode)." {
+                        send_user "db1: tbboot completed successfully.\n"
+                        set db1_status "success"
+                    }
+                    timeout {
+                        send_user "db1: tbboot did not complete in time, exiting.\n"
+                        set db1_status "failure"
+                    }
+                }
+            }
+            timeout {
+                send_user "db1: tbdown abnormal also did not complete in time.\n"
+                set db1_status "failure"
+            }
+        }
+    }
+}
+
+# db1 작업 완료 후 대기 시간
+send "sleep 60\n"
+expect "# "
+
+# db2 작업 시작
+send_user "Starting operations for db2...\n"
+
+# db2 계정으로 전환
+spawn su - db2
+expect "Password:"
+send "<password>\n"
+expect "# "
+
+# db2 환경 설정 파일 불러오기
+send ". ~/.profile\n"
+expect "# "
+
+# db2 지정된 함수 호출
+send "$FUNCTION\n"
+expect "# "
+
+# db2 DB 인스턴스 중지 (IMMEDIATE 옵션 사용)
+send "tbdown immediate\n"
+expect {
+    -re "tbdown failed. proc info file is deleted" {
+        send_user "db2: tbdown failed. The instance might already be stopped. Proceeding with tbboot.\n"
+        set db2_status "failure"
+
+        # 이미 중지된 경우 바로 재시작
+        send "tbboot\n"
+        expect {
+            "Tibero instance started up (NORMAL mode)." {
+                send_user "db2: tbboot completed successfully.\n"
+                set db2_status "success"
+            }
+            timeout {
+                send_user "db2: tbboot did not complete in time, exiting.\n"
+                set db2_status "failure"
+            }
+        }
+    }
+    -re "tbdown failed to connect" {
+        send_user "db2: tbdown failed to connect. Proceeding with tbdown abnormal.\n"
+        set db2_status "failure"
+
+        # tbdown abnormal 실행
+        send "tbdown abnormal\n"
+        expect {
+            "Tibero instance terminated (ABNORMAL mode)." {
+                send_user "db2: tbdown abnormal completed successfully. Proceeding with tbboot.\n"
+                sleep 10
+
+                # tbboot 실행
+                send "tbboot\n"
+                expect {
+                    "Tibero instance started up (NORMAL mode)." {
+                        send_user "db2: tbboot completed successfully.\n"
+                        set db2_status "success"
+                    }
+                    timeout {
+                        send_user "db2: tbboot did not complete in time, exiting.\n"
+                        set db2_status "failure"
+                    }
+                }
+            }
+            timeout {
+                send_user "db2: tbdown abnormal did not complete in time.\n"
+                set db2_status "failure"
+            }
+        }
+    }
+    -re "tbdown failed to receive greeting" {
+        send_user "db2: tbdown failed to receive greeting. Proceeding with tbdown abnormal.\n"
+        set db2_status "failure"
+
+        # tbdown abnormal 실행
+        send "tbdown abnormal\n"
+        expect {
+            "Tibero instance terminated (ABNORMAL mode)." {
+                send_user "db2: tbdown abnormal completed successfully. Proceeding with tbboot.\n"
+                sleep 10
+
+                # tbboot 실행
+                send "tbboot\n"
+                expect {
+                    "Tibero instance started up (NORMAL mode)." {
+                        send_user "db2: tbboot completed successfully.\n"
+						                       set db2_status "success"
+                    }
+                    timeout {
+                        send_user "db2: tbboot did not complete in time, exiting.\n"
+                        set db2_status "failure"
+                    }
+                }
+            }
+            timeout {
+                send_user "db2: tbdown abnormal did not complete in time.\n"
+                set db2_status "failure"
+            }
+        }
+    }
+    "Tibero instance terminated (IMMEDIATE mode)." {
+        send_user "db2: Tibero immediate completed successfully.\n"
+        set db2_status "success"
+	
+	# 정상 종료 후 tbboot 실행 추가
+    	send "tbboot\n"
+    	expect {
+        	"Tibero instance started up (NORMAL mode)." {
+            	send_user "db1: tbboot completed successfully.\n"
+            	set db1_status "success"
+        	}
+        timeout {
+            	send_user "db1: tbboot did not complete in time, exiting.\n"
+            	set db1_status "failure"
+        	}
+    	}
+    }
+    timeout {
+        send_user "db2: tbdown immediate did not respond within 5 minutes. Proceeding with tbdown abnormal.\n"
+
+        # tbdown 프로세스를 강제 종료
+        set pids [exec sh -c {ps -ef | grep tbdown | grep db2 | grep -v grep | awk '{print $2}'}]
+        if {[string length $pids] > 0} {
+            send_user "Killing tbdown processes: $pids\n"
+            exec kill -9 $pids
+        } else {
+            send_user "No tbdown processes found.\n"
+        }
+
+        # tbdown abnormal 실행
+        send "tbdown abnormal\n"
+        expect {
+            "Tibero instance terminated (ABNORMAL mode)." {
+                send_user "db2: tbdown abnormal completed successfully. Proceeding with tbboot.\n"
+                sleep 10        
+      
+                # tbboot 실행
+                send "tbboot\n"
+                expect {
+                    "Tibero instance started up (NORMAL mode)." {
+                        send_user "db2: tbboot completed successfully.\n"
+                        set db2_status "success"
+                    }
+                    timeout {
+                        send_user "db2: tbboot did not complete in time, exiting.\n"
+                        set db2_status "failure"
+                    }
+                }
+            }
+            timeout {
+                send_user "db2: tbdown abnormal also did not complete in time.\n"
+                set db2_status "failure"
+            }
+        }
+    }
+}
+
+# db2 작업 완료 후 대기 시간
+send "sleep 60\n"
+expect "# "
+
+# db2에서 로그아웃
+send "exit\n"
+expect eof
+
+# 작업 결과 출력
+if { $db1_status == "success" && $db2_status == "success" } {
+    send_user "All operations completed successfully on both db1 and db2.\n"
+} elseif { $db1_status == "failure" && $db2_status == "failure" } {
+    send_user "Both db1 and db2 instances failed to start.\n"
+} elseif { $db1_status == "failure" } {
+    send_user "db1 instance failed to start, but db2 completed successfully.\n"
+} elseif { $db2_status == "failure" } {
+    send_user "db2 instance failed to start, but db1 completed successfully.\n"
+} else {
+    send_user "Operations completed with mixed results. Check the logs for more details.\n"
+}
