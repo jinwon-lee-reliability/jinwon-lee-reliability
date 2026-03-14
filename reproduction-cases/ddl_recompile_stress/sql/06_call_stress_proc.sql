@@ -1,0 +1,4 @@
+BEGIN
+STRESS_PROC_A;
+END;
+/

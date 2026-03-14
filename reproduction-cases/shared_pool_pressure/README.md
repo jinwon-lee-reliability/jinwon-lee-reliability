@@ -61,9 +61,6 @@ Scenario Runner (Java)
 
 ## Project Structure
 
-
-db-failure-reproduction-lab/
-
 shared_pool_pressure/
 
 ScenarioRunner.java
